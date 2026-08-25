@@ -1,0 +1,5 @@
+pymupdf
+transformers
+torch
+rouge-score
+streamlit
