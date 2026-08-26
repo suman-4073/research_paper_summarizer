@@ -51,6 +51,7 @@ def clean_text(raw_text: str) -> str:
 if __name__ == "__main__":
     import sys
 
+    sys.stdout.reconfigure(encoding="utf-8")
     if len(sys.argv) < 2:
         print("Usage: python preprocess.py path/to/raw_text_file.txt")
         sys.exit(1)
@@ -59,5 +60,14 @@ if __name__ == "__main__":
         raw = f.read()
 
     cleaned = clean_text(raw)
-    print(cleaned[:1000])
-    print(f"\n[Raw: {len(raw)} chars -> Cleaned: {len(cleaned)} chars]")
+
+    if len(sys.argv) >= 3:
+        # Output path given explicitly -> write full cleaned text there
+        out_path = sys.argv[2]
+        with open(out_path, "w", encoding="utf-8") as f:
+            f.write(cleaned)
+        print(f"[Raw: {len(raw)} chars -> Cleaned: {len(cleaned)} chars] saved to {out_path}")
+    else:
+        # No output path -> just preview on screen (not meant for redirection)
+        print(cleaned[:1000])
+        print(f"\n[Raw: {len(raw)} chars -> Cleaned: {len(cleaned)} chars] (preview only, pass an output path to save full text)")
