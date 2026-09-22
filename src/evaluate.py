@@ -40,12 +40,24 @@ if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8")
 
     if len(sys.argv) < 2:
-        print("Usage: python evaluate.py path/to/cleaned_text_file.txt [bart|pegasus-arxiv]")
+        print("Usage: python evaluate.py path/to/cleaned_text_file.txt [bart|pegasus-arxiv] [full-body|intro-conclusion]")
         sys.exit(1)
 
     model_key = sys.argv[2] if len(sys.argv) >= 3 else DEFAULT_MODEL
     if model_key not in MODEL_OPTIONS:
         print(f"Unknown model '{model_key}'. Choose from: {list(MODEL_OPTIONS)}")
+        sys.exit(1)
+
+    # Which parts of the paper to feed the model:
+    # - "full-body": everything except Abstract/References/Acknowledgements
+    #   (works well for chunked models like BART, which see the whole paper)
+    # - "intro-conclusion": just Introduction + Conclusion, concatenated.
+    #   Short enough to fit a single-pass model (like PEGASUS) without
+    #   truncation, while still covering the motivation + result -- the
+    #   two things a real Abstract mostly consists of.
+    input_strategy = sys.argv[3] if len(sys.argv) >= 4 else "full-body"
+    if input_strategy not in ("full-body", "intro-conclusion"):
+        print(f"Unknown input strategy '{input_strategy}'. Choose from: full-body, intro-conclusion")
         sys.exit(1)
 
     with open(sys.argv[1], "r", encoding="utf-8") as f:
@@ -59,25 +71,29 @@ if __name__ == "__main__":
 
     real_abstract = sections["Abstract"]
 
-    body_sections = [
-        content for name, content in sections.items()
-        if name not in ("Front Matter", "Abstract", "References",
-                         "Acknowledgements", "Acknowledgments")
-    ]
-    body_text = " ".join(body_sections)
+    if input_strategy == "intro-conclusion":
+        parts = [sections.get(name, "") for name in ("Introduction", "Conclusion")]
+        body_text = " ".join(p for p in parts if p.strip())
+    else:
+        body_sections = [
+            content for name, content in sections.items()
+            if name not in ("Front Matter", "Abstract", "References",
+                             "Acknowledgements", "Acknowledgments")
+        ]
+        body_text = " ".join(body_sections)
 
     print(f"Loading model: {MODEL_OPTIONS[model_key]}")
     model, tokenizer, device = load_summarizer(model_key)
 
-    print(f"Summarizing paper body ({len(body_text)} chars)...")
-    generated = summarize_text(body_text, model, tokenizer, device,model_key)
+    print(f"Input strategy: {input_strategy} ({len(body_text)} chars)")
+    generated = summarize_text(body_text, model, tokenizer, device, model_key)
 
-    print("\n=== Generated Summary (from paper body) ===")
+    print("\n=== Generated Summary ===")
     print(generated)
     print("\n=== Real Abstract (reference) ===")
     print(real_abstract[:500] + ("..." if len(real_abstract) > 500 else ""))
 
     scores = evaluate_summary(generated, real_abstract)
-    print(f"\n=== ROUGE Scores ({model_key}, generated vs. real abstract) ===")
+    print(f"\n=== ROUGE Scores ({model_key}, {input_strategy}, generated vs. real abstract) ===")
     for metric, value in scores.items():
         print(f"{metric}: {value}")
