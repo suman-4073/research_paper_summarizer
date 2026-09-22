@@ -78,7 +78,7 @@ def _generate_summary(text_or_chunk: str, model, tokenizer, device, max_len: int
     """Run the model on a single piece of text and decode the result."""
     input_len = len(tokenizer.encode(text_or_chunk, add_special_tokens=False))
     if max_len is None:
-        max_len = min(150, max(30, input_len // 3))
+        max_len = min(200, max(30, input_len // 3))
 
     inputs = tokenizer(
         text_or_chunk,
